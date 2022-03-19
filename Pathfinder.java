@@ -12,17 +12,14 @@ public abstract class Pathfinder {
 
     public void findPath(int x, int y) {
         currentTile = new TileNode(new Position(x, y), null);
-
         currentTile.createChildren();
 
         do {
             while (currentTile.isActive())
                 move();
-
             //System.out.println(tileOccupied(currentTile.position));
-
-            currentTile = currentTile.tailingNode;
-        } while(currentTile.tailingNode != null && currentTile.isActive());
+            indicateTailSkip();
+        } while(currentTile != null);
     }
 
     public void move() {
@@ -36,63 +33,91 @@ public abstract class Pathfinder {
 
     public abstract boolean tileIsWall(Position tile);
 
-    public void indicateTailSkip() {}
-
     public TileNode getPath(TileNode tile) {
-        for(int i = 0; i < tile.childrenNode.length; i++) {
-            TileNode tilePath = tile.childrenNode[i];
-            if (tilePath != null) {
-                tile.childrenNode[i] = null;
-                tile.totalChildren--;
-                if(!tile.isActive()) {
-                    tilePath.tailingNode = currentTile.tailingNode;
-                    indicateTailSkip();
-                }
-                return tilePath;
-            }
-        }
-        throw new Error("Wrong execution sequence");
+//        if(!tile.isActive())
+//            return tile.tailingNode;
+        TileNode tilePath = tile.childrenNode[tile.totalChildren];
+        tile.totalChildren--;
+        if(!tile.isActive())
+            tilePath.tailingNode = currentTile.tailingNode;
+        return tilePath;
+    }
+
+    public void indicateTailSkip() {
+        currentTile = currentTile.tailingNode;
     }
 
     class TileNode {
         Position position;
         TileNode[] childrenNode;
         TileNode tailingNode;
-        byte totalChildren = 0;
+        byte totalChildren = -1;
 
         TileNode(Position position, TileNode parentNode) {
             this.position = position;
             tailingNode = parentNode;
-            tileMap.put(position, this);
+            tileMap.put(position);
         }
 
         public void createChildren() {
+            childrenNode = new TileNode[3];
+
+            Position newPosition = position.offset(0, -1);
+            if(!tileIsWall(newPosition) && !tileOccupied(newPosition))
+                createChild(newPosition);
+            newPosition = position.offset(-1, 0);
+            if(!tileIsWall(newPosition) && !tileOccupied(newPosition))
+                createChild(newPosition);
+            newPosition = position.offset(0, 1);
+            if(!tileIsWall(newPosition) && !tileOccupied(newPosition)) {
+                createChild(newPosition);
+                if(totalChildren == 2)
+                    return;
+            }
+            newPosition = position.offset(1, 0);
+            if(!tileIsWall(newPosition) && !tileOccupied(newPosition))
+                createChild(newPosition);
+
+        }
+
+        public void createChildren(int limit) {
+            limit--;
             childrenNode = new TileNode[4];
 
             Position newPosition = position.offset(0, -1);
-            if(!tileOccupied(newPosition) && !tileIsWall(newPosition)) {
-                totalChildren++;
-                childrenNode[0] = new TileNode(newPosition, this);
-            }
-            newPosition = position.offset(1, 0);
-            if(!tileOccupied(newPosition) && !tileIsWall(newPosition)) {
-                totalChildren++;
-                childrenNode[1] = new TileNode(newPosition, this);
+            if(!tileIsWall(newPosition) && !tileOccupied(newPosition)) {
+                createChild(newPosition);
+                if(limit == totalChildren)
+                    return;
             }
             newPosition = position.offset(-1, 0);
-            if(!tileOccupied(newPosition) && !tileIsWall(newPosition)) {
-                totalChildren++;
-                childrenNode[2] = new TileNode(newPosition, this);
+            if(!tileIsWall(newPosition) && !tileOccupied(newPosition)) {
+                createChild(newPosition);
+                if (limit == totalChildren)
+                    return;
             }
             newPosition = position.offset(0, 1);
-            if(!tileOccupied(newPosition) && !tileIsWall(newPosition)) {
-                totalChildren++;
-                childrenNode[3] = new TileNode(newPosition, this);
+            if(!tileIsWall(newPosition) && !tileOccupied(newPosition)) {
+                createChild(newPosition);
+                if (limit == totalChildren)
+                    return;
             }
+            newPosition = position.offset(1, 0);
+            if(!tileIsWall(newPosition) && !tileOccupied(newPosition)) {
+                createChild(newPosition);
+                if (limit == totalChildren)
+                    return;
+            }
+
         }
 
         public boolean isActive() {
-            return totalChildren > 0;
+            return totalChildren >= 0;
+        }
+
+        public void createChild(Position newPosition) {
+            totalChildren++;
+            childrenNode[totalChildren] = new TileNode(newPosition, this);
         }
 
     }
@@ -115,25 +140,26 @@ public abstract class Pathfinder {
         }
 
         //I'm using a fake hash code because there are int*int possibilities
-        public long toHashCode() {
-            long hash = x;
-            hash <<= 32;
-            hash |= y;
-            return hash;
+        public boolean equals(Position value) {
+            return value.x == x && value.y == y;
         }
     }
 
     class SimpleTileMap {
         //ArrayList<TileNode> Values = new ArrayList<>();
-        ArrayList<Long> Keys = new ArrayList<>();
+//        Map Keys = new HashMap<Integer, ArrayList<Integer>>();
+        ArrayList<Position> Keys = new ArrayList<>();
 
-        public void put(Position key, TileNode value) {
-            Keys.add(key.toHashCode());
-            //Values.add(value);
+        //will be key, value
+        public void put(Position key) {
+            Keys.add(key);
         }
 
         public boolean containsKey(Position Key) {
-            return Keys.contains(Key.toHashCode());
+            for(Position key : Keys)
+                if(key.equals(Key))
+                    return true;
+            return false;
         }
     }
 }

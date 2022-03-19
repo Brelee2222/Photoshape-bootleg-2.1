@@ -8,20 +8,20 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 
+//I have a tendency to capitalize things
+
 public class PhotoshapeCanvas extends JPanel {
     //fix: put inside another JPanel so that is doesn't update canvas on resize.
 
     BufferedImage image = new BufferedImage(800,800,BufferedImage.TYPE_INT_RGB);
     ActionHistory actionHistory = new ActionHistory(new BufferedImage(image.getColorModel(), image.copyData(null), image.isAlphaPremultiplied(), null));
     PhotoshapeGraphics photoshapeGraphics = new PhotoshapeGraphics(800, 600);
+    JFrame optionsDialogue;
+
     PhotoshapeCanvas() {
         setLayout(new BorderLayout());
         add(photoshapeGraphics, BorderLayout.CENTER);
         addComponentListener(new Resizing());
-
-        MouseInputListener paint = new PaintBrush(this);
-        photoshapeGraphics.addMouseListener(paint);
-        photoshapeGraphics.addMouseMotionListener(paint);
     }
 
     class PhotoshapeGraphics extends ImagePhotoshaper {

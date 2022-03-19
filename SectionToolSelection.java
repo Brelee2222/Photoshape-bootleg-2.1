@@ -11,6 +11,7 @@ public class SectionToolSelection extends JMenuBar {
     JMenuItem eraser;
     JMenuItem colorChooser;
     JMenuItem bucketPaint;
+    JMenuItem toolSettings;
 
 
     {
@@ -25,12 +26,16 @@ public class SectionToolSelection extends JMenuBar {
         paintBrush = new SectionToolSelectionButton("Paint Brush", new PaintBrush(canvas));
         bucketPaint = new SectionToolSelectionButton("Bucket", new PaintBucket(canvas));
 
+        toolSettings = new ToolSettings("Tool");
+
         colorChooser = new ColorChooserButton("Color");
 
         add(paintBrush);
         add(lineTool);
         add(eraser);
         add(bucketPaint);
+
+        add(toolSettings);
 
         add(colorChooser);
     }
@@ -50,6 +55,24 @@ public class SectionToolSelection extends JMenuBar {
         @Override
         public void actionPerformed(ActionEvent e) {
             canvas.photoshapeGraphics.changeDrawFunction(toolFunction);
+        }
+    }
+
+    class ToolSettings extends JMenuItem implements ActionListener {
+
+        ToolSettings(String title) {
+            super(title);
+
+            addActionListener(this);
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            JFrame options = canvas.optionsDialogue;
+
+
+
+            options.setVisible(true);
         }
     }
 

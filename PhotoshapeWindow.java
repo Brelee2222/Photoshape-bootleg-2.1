@@ -1,7 +1,6 @@
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 
@@ -12,9 +11,9 @@ public class PhotoshapeWindow extends JFrame {
         super(title);
         setLayout(new BorderLayout());
 
-        JPanel photoshapeCanvas = new PhotoshapeCanvas();
-        JPanel sectionToolSelection = new SectionToolSelectionPanel((PhotoshapeCanvas) photoshapeCanvas);
-        MenuBar headerBar = new HeaderBar((PhotoshapeCanvas) photoshapeCanvas);
+        PhotoshapeCanvas photoshapeCanvas = new PhotoshapeCanvas();
+        JPanel sectionToolSelection = new SectionToolSelectionPanel(photoshapeCanvas);
+        MenuBar headerBar = new HeaderBar(photoshapeCanvas);
 
         add(photoshapeCanvas);
         add(sectionToolSelection, BorderLayout.WEST);

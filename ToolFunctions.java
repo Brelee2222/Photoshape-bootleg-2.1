@@ -6,6 +6,7 @@ import javax.swing.event.MouseInputListener;
 import java.awt.*;
 import java.awt.event.MouseEvent;
 import java.awt.image.*;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -22,6 +23,13 @@ class PaintBrush implements MouseInputListener {
     public PaintBrush(PhotoshapeCanvas canvas) {
         this.canvas = canvas;
         this.canvasGraphics = canvas.photoshapeGraphics;
+        canvasGraphics.addMouseListener(this);
+        canvasGraphics.addMouseMotionListener(this);
+        this.canvas.optionsDialogue = new PaintOptions(this);
+    }
+
+    public void setBrushSize(int brushSize) {
+        this.brushSize = brushSize;
     }
 
     @Override
@@ -72,8 +80,6 @@ class PaintBrush implements MouseInputListener {
         pen.setStroke(new BasicStroke(brushSize));
         pen.drawLine(x, y, prevMouseLocX, prevMouseLocY);
 
-        int brushDiameter = brushSize/2;
-        pen.fillOval(x - brushDiameter, y - brushDiameter, brushSize, brushSize);
         setMouseLoc(x, y);
         canvasGraphics.update(canvasGraphics.getPen());
         canvasGraphics.draw();
@@ -226,7 +232,7 @@ class PaintBucket implements MouseInputListener {
     PhotoshapeCanvas canvas;
     PhotoshapeCanvas.PhotoshapeGraphics canvasGraphics;
 
-    int tolerance = 25;
+    int tolerance = 50;
 
     public PaintBucket(PhotoshapeCanvas canvas) {
         this.canvas = canvas;
@@ -235,15 +241,16 @@ class PaintBucket implements MouseInputListener {
 
     @Override
     public void mouseClicked(MouseEvent e) {
+        canvasGraphics.newActionHistory();
+
         TranslationMultiplier translationMultiplier = canvasGraphics.translationMultiplier;
 
 
 
         int x = (int) (e.getX() / translationMultiplier.multiplierX);
         int y = (int) (e.getY() / translationMultiplier.multiplierY);
-
         new BucketPath(x, y).findPath(x, y);
-        System.out.println("done");
+        canvas.image.setRGB(x, y, canvasGraphics.penColor.getRGB());
         canvasGraphics.draw();
     }
 
@@ -278,7 +285,6 @@ class PaintBucket implements MouseInputListener {
     }
     class BucketPath extends Pathfinder {
         BufferedImage image = canvas.image;
-
         int color = canvasGraphics.penColor.getRGB();
 
         int selectedColor;
@@ -291,18 +297,21 @@ class PaintBucket implements MouseInputListener {
             selectedColorR = selectedColor >> 16 & 0xff;
             selectedColorG = selectedColor >> 8 & 0xff;
             selectedColorB = selectedColor & 0xff;
+
+            tileMap = new TileMap();
         }
 
         @Override
         public void move() {
             super.move();
             image.setRGB(currentTile.position.x, currentTile.position.y, color);
-            canvasGraphics.draw();
         }
 
         @Override
         public void indicateTailSkip() {
-            image.setRGB(currentTile.position.x, currentTile.position.y, 0xff0000ff);
+            image.setRGB(currentTile.position.x, currentTile.position.y, color ^ 0xffffff);
+            canvasGraphics.draw();
+            super.indicateTailSkip();
         }
 
         @Override
@@ -325,6 +334,18 @@ class PaintBucket implements MouseInputListener {
             int gD = selectedColorG - g;
             int bD = selectedColorB - b;
             return (tolerance >= rD && rD >= -tolerance) && (tolerance >= gD && gD >= -tolerance) && (tolerance >= bD && bD >= -tolerance);
+        }
+        class TileMap extends SimpleTileMap{
+            boolean[][] map = new boolean[image.getWidth()][image.getHeight()];
+
+
+            public void put(Position key) {
+                map[key.x][key.y] = true;
+            }
+
+            public boolean containsKey(Position key) {
+                return map[key.x][key.y];
+            }
         }
     }
 }
