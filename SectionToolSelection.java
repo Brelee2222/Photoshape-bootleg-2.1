@@ -13,12 +13,9 @@ public class SectionToolSelection extends JMenuBar {
     JMenuItem bucketPaint;
     JMenuItem toolSettings;
 
-
-    {
-        setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
-    }
-
     public SectionToolSelection(PhotoshapeCanvas canvas) {
+        setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+
         this.canvas = canvas;
 
         eraser = new SectionToolSelectionButton("Eraser", new Erase(canvas));
@@ -55,6 +52,8 @@ public class SectionToolSelection extends JMenuBar {
         @Override
         public void actionPerformed(ActionEvent e) {
             canvas.photoshapeGraphics.changeDrawFunction(toolFunction);
+            //I made this function call through ToolFunctions in case I need to add extra processes.
+            ((OptionsToolPanel) toolFunction).changeToolOptions();
         }
     }
 
@@ -62,15 +61,12 @@ public class SectionToolSelection extends JMenuBar {
 
         ToolSettings(String title) {
             super(title);
-
             addActionListener(this);
         }
 
         @Override
         public void actionPerformed(ActionEvent e) {
             JFrame options = canvas.optionsDialogue;
-
-
 
             options.setVisible(true);
         }
@@ -80,14 +76,21 @@ public class SectionToolSelection extends JMenuBar {
         public ColorChooserButton(String title) {
             super(title);
             addActionListener(this);
+            changeColor(canvas.photoshapeGraphics.penColor);
             JOptionPane optionPane = new JOptionPane();
-            optionPane.createDialog("hi");
+            optionPane.createDialog("ColorChooser");
             //JOptionPane.
+        }
+
+        public void changeColor(Color penColor) {
+            setBackground(penColor);
+            setText("<html><font Color=#" + Integer.toHexString(penColor.getRGB() ^ 0xffffffff) + ">Color</font></html>");
         }
 
         @Override
         public void actionPerformed(ActionEvent e) {
-            canvas.photoshapeGraphics.penColor = JColorChooser.showDialog(this, "Choose Color", Color.RED);
+            canvas.photoshapeGraphics.penColor = JColorChooser.showDialog(this, "Choose Color", canvas.photoshapeGraphics.penColor);
+            changeColor(canvas.photoshapeGraphics.penColor);
         }
 
     }

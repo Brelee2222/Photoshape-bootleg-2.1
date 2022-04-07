@@ -4,9 +4,9 @@ import java.util.*;
 
 public abstract class Pathfinder {
 
-    boolean debug = true;
-
     TileNode currentTile;
+
+    public Runnable indicateTailSkip = () -> currentTile = currentTile.tailingNode;
 
     SimpleTileMap tileMap = new SimpleTileMap();
 
@@ -18,13 +18,8 @@ public abstract class Pathfinder {
             while (currentTile.isActive())
                 move();
             //System.out.println(tileOccupied(currentTile.position));
-            indicateTailSkip();
+            indicateTailSkip.run();
         } while(currentTile != null);
-    }
-
-    public void move() {
-        currentTile = getPath(currentTile);
-        currentTile.createChildren();
     }
 
     public boolean tileOccupied(Position position) {
@@ -32,6 +27,11 @@ public abstract class Pathfinder {
     }
 
     public abstract boolean tileIsWall(Position tile);
+
+    public void move() {
+        currentTile = getPath(currentTile);
+        currentTile.createChildren();
+    }
 
     public TileNode getPath(TileNode tile) {
 //        if(!tile.isActive())
@@ -41,10 +41,6 @@ public abstract class Pathfinder {
         if(!tile.isActive())
             tilePath.tailingNode = currentTile.tailingNode;
         return tilePath;
-    }
-
-    public void indicateTailSkip() {
-        currentTile = currentTile.tailingNode;
     }
 
     class TileNode {

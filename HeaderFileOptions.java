@@ -79,6 +79,7 @@ class HeaderFileOptions extends Menu {
             File selectedFile = fileChooser.getSelectedFile();
             if(selectedFile != null)
                 canvas.photoshapeGraphics.loadImage(selectedFile);
+            canvas.photoshapeGraphics.resized();
         }
 
     }

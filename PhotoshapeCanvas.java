@@ -8,15 +8,17 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 
+
 //I have a tendency to capitalize things
+
 
 public class PhotoshapeCanvas extends JPanel {
     //fix: put inside another JPanel so that is doesn't update canvas on resize.
 
-    BufferedImage image = new BufferedImage(800,800,BufferedImage.TYPE_INT_RGB);
-    ActionHistory actionHistory = new ActionHistory(new BufferedImage(image.getColorModel(), image.copyData(null), image.isAlphaPremultiplied(), null));
+    BufferedImage image;
+    ActionHistory actionHistory;
     PhotoshapeGraphics photoshapeGraphics = new PhotoshapeGraphics(800, 600);
-    JFrame optionsDialogue;
+    OptionsWindow optionsDialogue = new OptionsWindow();
 
     PhotoshapeCanvas() {
         setLayout(new BorderLayout());
@@ -26,16 +28,20 @@ public class PhotoshapeCanvas extends JPanel {
 
     class PhotoshapeGraphics extends ImagePhotoshaper {
         AspectRatio aspectRatio = new AspectRatio();
-        TranslationMultiplier translationMultiplier = new TranslationMultiplier(new Dimension(image.getWidth(), image.getHeight()));
+        TranslationMultiplier translationMultiplier;
         Color penColor;
-
-        {
-            setColor(Color.RED);
-            setCursor(new Cursor(1));
-        }
+        //I'm not sure if this is legal java code
+//        {
+//            setColor(Color.RED);
+//            setCursor(new Cursor(1));
+//        }
 
         public PhotoshapeGraphics(int width, int height) {
             super(width, height);
+            setColor(Color.RED);
+            loadImage(new File("./cat.jpg"));
+            translationMultiplier = new TranslationMultiplier(new Dimension(image.getWidth(), image.getHeight()));
+            actionHistory = new ActionHistory(new BufferedImage(image.getColorModel(), image.copyData(null), image.isAlphaPremultiplied(), null));
         }
 
         public void loadImage(File filepath) {
@@ -49,31 +55,17 @@ public class PhotoshapeCanvas extends JPanel {
 
             aspectRatio.setNewMultipliers(dimension);
             translationMultiplier = new TranslationMultiplier(dimension);
-            //Fits image
+            resize();
             actionHistory = new ActionHistory(new BufferedImage(image.getColorModel(), image.copyData(null), image.isAlphaPremultiplied(), null));
-            resized();
         }
 
         public void setColor(Color penColor) {
             this.penColor = penColor;
         }
 
-        public void resized() {
-            Dimension dimension;
-
-            int width = getWidth();
-            int height = getHeight();
-
-            int heightTranslation = (int) (width*aspectRatio.multiplierHeight);
-
-            if(heightTranslation < height)
-                dimension = new Dimension(width, heightTranslation);
-            else
-                dimension = new Dimension((int) (height*aspectRatio.multiplierWidth), height);
-            sizeImage(dimension);
-            translationMultiplier.setMultiplier(this.getSize());
-            update(getPen());
-            draw();
+        public void sizeImage(Dimension dimension) {
+            setSize(dimension);
+            setPreferredSize(dimension);
         }
 
         public void draw() {
@@ -115,6 +107,28 @@ public class PhotoshapeCanvas extends JPanel {
             }
         }
 
+        public void resize() {
+            Dimension dimension;
+
+            int width = getWidth();
+            int height = getHeight();
+
+            int heightTranslation = (int) (width * aspectRatio.multiplierHeight);
+
+            if (heightTranslation < height)
+                dimension = new Dimension(width, heightTranslation);
+            else
+                dimension = new Dimension((int) (height * aspectRatio.multiplierWidth), height);
+            sizeImage(dimension);
+            translationMultiplier.setMultiplier(getSize());
+        }
+
+        public void resized() {
+            resize();
+            update(photoshapeGraphics.getPen());
+            photoshapeGraphics.draw();
+        }
+
         public void newActionHistory() {
             actionHistory.next = new ActionHistory(new BufferedImage(image.getColorModel(), image.copyData(null), image.isAlphaPremultiplied(), null));
             actionHistory.next.prev = actionHistory;
@@ -122,11 +136,13 @@ public class PhotoshapeCanvas extends JPanel {
             image = actionHistory.image;
         }
 
-        public void sizeImage(Dimension dimension) {
-            this.setSize(dimension);
-            this.setPreferredSize(dimension);
+        @Override
+        public void addNotify() {
+            super.addNotify();
+            draw();
         }
     }
+    //I made it resize the panel so that it doesn't blink
     public class Resizing extends ComponentAdapter {
 
         public void componentResized(ComponentEvent event)

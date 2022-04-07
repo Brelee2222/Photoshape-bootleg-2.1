@@ -1,7 +1,12 @@
+import javax.swing.*;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.image.BufferedImage;
+import java.util.Arrays;
+import java.util.concurrent.Callable;
 
 public class ColorFilterOptions extends Menu {
 
@@ -18,7 +23,7 @@ public class ColorFilterOptions extends Menu {
          */
         add(new GrayScaler("Gray Scale"));
         add(new ColorInverter("Inverted Color"));
-        add(new CanvasBlurrer("Blur"));
+        add(new CanvasBlurrerMenu());
     }
 
     class GrayScaler extends MenuItem implements ActionListener {
@@ -89,84 +94,218 @@ public class ColorFilterOptions extends Menu {
             canvasGraphics.draw();
         }
     }
-    class CanvasBlurrer extends MenuItem implements ActionListener {
-        PhotoshapeCanvas.PhotoshapeGraphics canvasGraphics;
-        int blurrIntensity = 1;
-        int blurIntensityDimensions;
 
-        {
-            addActionListener(this);
+    class CanvasBlurrerMenu extends Menu {
 
-            blurIntensityDimensions = 2* blurrIntensity + 1;
+        CanvasBlurrer CanvasBlurrer = new CanvasBlurrer("Blur");
+
+        CanvasBlurrerMenu() {
+            super("Blur");
+
+            add(CanvasBlurrer);
+            add(new CanvasBlurrerOptions());
         }
 
-        CanvasBlurrer(String title) {
-            super(title);
+        class CanvasBlurrer extends MenuItem implements ActionListener {
 
-            canvasGraphics = canvas.photoshapeGraphics;
-        }
+            /*
+            4/6/2022 : significantly cut down blur computing time. Might add debug, inverted averaging
+             */
 
-        int getBlurAverage(int x, int y) {
+            short[][] stripAverageSection;
 
-            BufferedImage image = canvas.image;
-            int width = image.getWidth();
-            int height = image.getHeight();
+            PhotoshapeCanvas.PhotoshapeGraphics canvasGraphics;
+            int blurrIntensity = 50;
+            int blurIntensityDimensions;
 
-            int startX = x - blurrIntensity;
-            int startY = y - blurrIntensity;
+            boolean invertedAveraging = false;
 
-            int endX = blurIntensityDimensions;
-            int endY = blurIntensityDimensions;
+            CanvasBlurrer(String title) {
+                super(title);
 
-            int totalAverageValue = 0;
+                addActionListener(this);
 
-            int totalRed = 0;
-            int totalBlue = 0;
-            int totalGreen = 0;
+                blurIntensityDimensions = 2 * blurrIntensity;
 
-            if(endX + startX >= width)
-                endX = width - 1 - startX;
-            if(endY + startY >= height)
-                endY = height - 1 - startY;
-
-            if (startX < 0)
-                startX = 0;
-            if(startY < 0)
-                startY = 0;
-
-            int[] rgbVals = image.getRGB(startX, startY, endX, endY, null, 0, endX);
-
-            for (int m : rgbVals) {
-                    totalAverageValue++;
-                    totalBlue += m & 0xff;
-                    m >>= 8;
-                    totalGreen += m & 0xff;
-                    m >>= 8;
-                    totalRed += m & 0xff;
+                canvasGraphics = canvas.photoshapeGraphics;
             }
 
-            int rgb = image.getRGB(x, y);
-            totalRed /= totalAverageValue;
-            totalGreen /= totalAverageValue;
-            totalBlue /= totalAverageValue;
+            int getBlurAverage(int startX, int startY, int endX, int endY) {
 
-            return (rgb & 0xff000000) | totalRed<<16 | totalGreen<<8 | totalBlue;
-        }
+                BufferedImage image = canvas.image;
 
-        @Override
-        public void actionPerformed(ActionEvent e) {
-            BufferedImage image = canvas.image;
+                int nonCalcCount = 0;
 
-            BufferedImage blurrImage = new BufferedImage(image.getColorModel(), image.copyData(null), image.isAlphaPremultiplied(), null);
+                int rAvg = 0;
+                int gAvg = 0;
+                int bAvg = 0;
+                int aAvg = 0;
 
-            for(int i = 0; i < image.getWidth(); i++)
-                for(int j = 0; j < image.getHeight(); j++) {
-                    blurrImage.setRGB(i, j, getBlurAverage(i, j));
+                for(int cx = startX; cx < startX + endX; cx++) {
+                    if (stripAverageSection[nonCalcCount] == null) {
+                        stripAverageSection[nonCalcCount] = new short[4];
+                        int[] rgbPixelStrip = image.getRGB(cx, startY, 1, endY, null, 0, 1);
+                        int[][] rgbPixelColorStrip = new int[4][endY];
+                        for (int i = 0; i < endY; i++) {
+                            rgbPixelColorStrip[0][i] = (rgbPixelStrip[i] >> 16) & 0xff;
+                            rgbPixelColorStrip[1][i] = (rgbPixelStrip[i] >> 8) & 0xff;
+                            rgbPixelColorStrip[2][i] = rgbPixelStrip[i] & 0xff;
+                            rgbPixelColorStrip[3][i] = (rgbPixelStrip[i] >> 24) & 0xff;
+                        }
+                        stripAverageSection[nonCalcCount][0] = (short) Arrays.stream(rgbPixelColorStrip[0]).average().getAsDouble();
+                        stripAverageSection[nonCalcCount][1] = (short) Arrays.stream(rgbPixelColorStrip[1]).average().getAsDouble();
+                        stripAverageSection[nonCalcCount][2] = (short) Arrays.stream(rgbPixelColorStrip[2]).average().getAsDouble();
+                        stripAverageSection[nonCalcCount][3] = (short) Arrays.stream(rgbPixelColorStrip[3]).average().getAsDouble();
+                    }
+                    rAvg += stripAverageSection[nonCalcCount][0];
+                    gAvg += stripAverageSection[nonCalcCount][1];
+                    bAvg += stripAverageSection[nonCalcCount][2];
+                    aAvg += stripAverageSection[nonCalcCount++][3];
                 }
-            canvas.image = blurrImage;
-            canvasGraphics.update(canvasGraphics.getPen());
-            canvasGraphics.draw();
+
+                if(invertedAveraging)
+                    return (aAvg / endY) << 24 | (rAvg / endY) << 16 | (gAvg / endY) << 8 | bAvg / endY;
+                return (aAvg / nonCalcCount) << 24 | (rAvg / nonCalcCount) << 16 | (gAvg / nonCalcCount) << 8 | bAvg / nonCalcCount;
+
+            }
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                BufferedImage image = canvas.image;
+
+                BufferedImage blurrImage = new BufferedImage(image.getColorModel(), image.copyData(null), image.isAlphaPremultiplied(), null);
+
+
+                short[][] emptyList = new short[blurIntensityDimensions][4];
+                for(int i = 0; i < emptyList.length; i++)
+                    emptyList[i] = null;
+                int startY;
+                int endY;
+                int startX;
+                int endX;
+                int imageWidth = image.getWidth();
+                int imageHeight = image.getHeight();
+                for (int i = 0; i < image.getHeight(); i++) {
+                    startY = i-blurrIntensity;
+                    endY = blurIntensityDimensions;
+                    stripAverageSection = emptyList.clone();
+                    if(startY < 0) {
+                        endY += startY;
+                        startY = 0;
+                    }
+                    if(endY + startY >= imageHeight)
+                        endY = imageHeight - startY - 1;
+//                    int oldestStrip = 0;
+                    for (int j = 0; j < image.getWidth(); j++) {
+
+                        startX = j-blurrIntensity;
+                        endX = blurIntensityDimensions;
+
+                        if(startX < 0) {
+                            endX += startX;
+                            startX = 0;
+                        }
+
+                        if(endX + startX >= imageWidth)
+                            endX = imageWidth - startX - 1;
+
+                        blurrImage.setRGB(j, i, getBlurAverage(startX, startY, endX, endY));
+
+                        if (stripAverageSection[stripAverageSection.length - 1] != null) {
+                            for (int k = 0; k < stripAverageSection.length - 1; )
+                                stripAverageSection[k++] = stripAverageSection[k];
+                            stripAverageSection[stripAverageSection.length - 1] = null;
+                        }
+
+
+
+
+                        stripAverageSection[0] = null;
+//                        stripAverageSection[oldestStrip++] = null;
+//                        if(oldestStrip == blurIntensityDimensions)
+//                            oldestStrip = 0;
+                    }
+//                    canvasGraphics.getPen().drawImage(blurrImage, 0, 0, canvasGraphics.getWidth(), canvasGraphics.getHeight(), null);
+//                    canvasGraphics.display();
+                }
+                canvas.image = blurrImage;
+                canvasGraphics.update(canvasGraphics.getPen());
+                canvasGraphics.draw();
+            }
         }
+
+        class CanvasBlurrerOptions extends MenuItem implements ActionListener {
+
+            JFrame BlurOptionsFrame = new BlurOptions();
+
+            CanvasBlurrerOptions() {
+                super("Blur Options");
+
+                addActionListener(this);
+            }
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                BlurOptionsFrame.setVisible(true);
+            }
+
+            class BlurOptions extends JFrame{
+
+                JPanel SliderContainer = new JPanel();
+                JSlider SliderIntensity = new SliderIntensity();
+                JLabel SliderLabel = new JLabel("Blur Intensity " + CanvasBlurrer.blurrIntensity);
+                JPanel InvertedAvgContainer = new JPanel();
+                JCheckBox InvertedAveragingCheck = new JCheckBox();
+
+                BlurOptions() {
+                    super("Blur Options");
+
+                    setLayout(new BorderLayout());
+                    SliderContainer.setLayout(new BoxLayout(SliderContainer, BoxLayout.X_AXIS));
+                    InvertedAvgContainer.setLayout(new BoxLayout(InvertedAvgContainer, BoxLayout.X_AXIS));
+
+                    InvertedAvgContainer.add(new JLabel("Inverted Averaging"));
+                    InvertedAvgContainer.add(InvertedAveragingCheck);
+                    SliderContainer.add(SliderLabel);
+                    SliderContainer.add(SliderIntensity);
+
+                    add(SliderContainer, BorderLayout.NORTH);
+                    add(InvertedAvgContainer, BorderLayout.CENTER);
+
+                    add(new OkButton(), BorderLayout.SOUTH);
+
+                    pack();
+                }
+
+                class OkButton extends JButton implements ActionListener{
+                    OkButton() {
+                        super("OK");
+
+                        addActionListener(this);
+                    }
+
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        CanvasBlurrer.blurrIntensity = SliderIntensity.getValue();
+                        CanvasBlurrer.blurIntensityDimensions = 2 * CanvasBlurrer.blurrIntensity + 1;
+                        CanvasBlurrer.invertedAveraging = InvertedAveragingCheck.isSelected();
+                        BlurOptionsFrame.setVisible(false);
+                    }
+                }
+                class SliderIntensity extends JSlider implements ChangeListener {
+
+                    SliderIntensity() {
+                        super(0, 255, CanvasBlurrer.blurrIntensity);
+                        addChangeListener(this);
+                    }
+
+                    @Override
+                    public void stateChanged(ChangeEvent e) {
+                        SliderLabel.setText("Blur Intensity " + SliderIntensity.getValue());
+                    }
+                }
+            }
+        }
+
     }
-    
 }

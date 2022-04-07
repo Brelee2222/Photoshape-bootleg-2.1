@@ -5,57 +5,101 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
-class PaintOptions extends JFrame {
-    PaintBrush tool;
+class OptionsWindow extends JFrame {
+    //I felt like using classes but it felt more right to use a lambda
+    Runnable okAction;
 
-    JPanel brushSize;
+    JButton okButton = new JButton("ok");
+    DisplayableOptions displayableOptions = new DisplayableOptions();
 
-    {
+    OptionsWindow() {
         setLayout(new BorderLayout());
-    }
-    PaintOptions(PaintBrush tool) {
-        this.tool = tool;
-        brushSize = new BrushSize();
 
-        add(brushSize, BorderLayout.NORTH);
+        add(displayableOptions, BorderLayout.NORTH);
 
-        add(new OkButton(), BorderLayout.SOUTH);
+        add(okButton, BorderLayout.SOUTH);
+
+        okButton.addActionListener(new ChangeOptions());
+
         pack();
     }
 
-    class OkButton extends JButton implements ActionListener {
-
-        OkButton() {
-            super("ok");
-
-            addActionListener(this);
-
-        }
+    class ChangeOptions implements ActionListener {
 
         @Override
         public void actionPerformed(ActionEvent e) {
-            tool.setBrushSize(((BrushSize) brushSize).brushSizeSlider.getValue());
+            okAction.run();
+            setVisible(false);
         }
     }
 
-    class BrushSize extends JPanel {
-        JSlider brushSizeSlider = new BrushSizeSlider(0, 255);
-        JLabel brushLabel = new JLabel("Brush Size : " + tool.brushSize);
-        //might add stuff
-        {
-            add(brushLabel);
-            add(brushSizeSlider);
-        }
-        class BrushSizeSlider extends JSlider implements ChangeListener {
+    class DisplayableOptions extends JPanel {
+        public OptionContent[] CurrentOptions;
 
-            BrushSizeSlider(int min, int max) {
-                super(min, max, tool.brushSize);
-            }
+        DisplayableOptions() {
 
-            @Override
-            public void stateChanged(ChangeEvent e) {
-                brushLabel.setText("Brush Size : " + getValue());
-            }
+            setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+
         }
+
+        public void switchOptions(OptionContent[] newOptions, Runnable newOkAction) {
+            CurrentOptions = newOptions;
+            okAction = newOkAction;
+            update();
+        }
+
+        public void update() {
+            removeAll();
+
+            for(OptionContent option : CurrentOptions)
+                this.add(option.optionPanel);
+            pack();
+        }
+    }
+}
+
+
+
+class OptionContent {
+    JLabel optionName;
+    Component optionValue;
+    String name;
+    JPanel optionPanel = new JPanel();
+
+    OptionContent(String name, Component optionValue) {
+        this.name = name;
+        this.optionValue = optionValue;
+
+        optionName = new JLabel(name);
+
+        optionPanel.setLayout(new BoxLayout(optionPanel, BoxLayout.X_AXIS));
+        //might add counter
+        optionPanel.add(optionName);
+        optionPanel.add(optionValue);
+    }
+
+    OptionContent(String name, JSlider optionValue) {
+        this.name = name;
+        this.optionValue = optionValue;
+
+        //I got lazy to make a new constructor that has one more variable for an initial value to display
+        optionName = new JLabel(name + optionValue.getValue());
+
+        optionPanel.setLayout(new BoxLayout(optionPanel, BoxLayout.X_AXIS));
+        //might add counter
+        optionPanel.add(optionName);
+        optionPanel.add(optionValue);
+    }
+
+    //ignor this being in this class
+
+    abstract public static class SliderOption extends JSlider implements ChangeListener {
+        SliderOption(int min, int max, int set) {
+            super(min, max, set);
+            addChangeListener(this);
+        }
+
+        abstract public void stateChanged(ChangeEvent e);
+
     }
 }

@@ -2,16 +2,19 @@
 Has the functions to paint on the image
  */
 
+import javax.swing.*;
+import javax.swing.event.ChangeEvent;
 import javax.swing.event.MouseInputListener;
 import java.awt.*;
 import java.awt.event.MouseEvent;
 import java.awt.image.*;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 
-class PaintBrush implements MouseInputListener {
+interface OptionsToolPanel {
+    void changeToolOptions();
+}
+
+class PaintBrush implements MouseInputListener, OptionsToolPanel {
 
     PhotoshapeCanvas canvas;
     PhotoshapeCanvas.PhotoshapeGraphics canvasGraphics;
@@ -20,16 +23,21 @@ class PaintBrush implements MouseInputListener {
     int prevMouseLocX;
     int prevMouseLocY;
 
+    OptionContent[] options = new OptionContent[]{
+            new OptionContent("Brush Size ", new OptionContent.SliderOption(0, 255, brushSize) {
+                @Override
+                public void stateChanged(ChangeEvent e) {
+                    options[0].optionName.setText(options[0].name + ((JSlider) options[0].optionValue).getValue());
+                }
+            })
+    };
+
     public PaintBrush(PhotoshapeCanvas canvas) {
         this.canvas = canvas;
         this.canvasGraphics = canvas.photoshapeGraphics;
         canvasGraphics.addMouseListener(this);
         canvasGraphics.addMouseMotionListener(this);
-        this.canvas.optionsDialogue = new PaintOptions(this);
-    }
-
-    public void setBrushSize(int brushSize) {
-        this.brushSize = brushSize;
+        changeToolOptions();
     }
 
     @Override
@@ -47,7 +55,6 @@ class PaintBrush implements MouseInputListener {
 
     @Override
     public void mouseReleased(MouseEvent e) {
-
     }
 
     @Override
@@ -77,7 +84,7 @@ class PaintBrush implements MouseInputListener {
 
         int x = (int) (e.getX() / translationMultiplier.multiplierX);
         int y = (int) (e.getY() / translationMultiplier.multiplierY);
-        pen.setStroke(new BasicStroke(brushSize));
+        pen.setStroke(new BasicStroke(brushSize, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         pen.drawLine(x, y, prevMouseLocX, prevMouseLocY);
 
         setMouseLoc(x, y);
@@ -89,9 +96,16 @@ class PaintBrush implements MouseInputListener {
         prevMouseLocX = X;
         prevMouseLocY = Y;
     }
+
+    @Override
+    public void changeToolOptions() {
+        canvas.optionsDialogue.displayableOptions.switchOptions(options, () ->
+            brushSize = ((JSlider) options[0].optionValue).getValue()
+        );
+    }
 }
 
-class LineTool implements MouseInputListener {
+class LineTool implements MouseInputListener, OptionsToolPanel {
 
     PhotoshapeCanvas canvas;
     PhotoshapeCanvas.PhotoshapeGraphics canvasGraphics;
@@ -99,6 +113,15 @@ class LineTool implements MouseInputListener {
 
     int initialX;
     int initialY;
+
+    OptionContent[] options = new OptionContent[]{
+            new OptionContent("Line Thickness ", new OptionContent.SliderOption(0, 255, lineThickness) {
+                @Override
+                public void stateChanged(ChangeEvent e) {
+                    options[0].optionName.setText(options[0].name + ((JSlider) options[0].optionValue).getValue());
+                }
+            })
+    };
 
     public LineTool(PhotoshapeCanvas canvas) {
         this.canvas = canvas;
@@ -122,6 +145,7 @@ class LineTool implements MouseInputListener {
         Graphics2D pen = (Graphics2D) canvas.image.getGraphics();
         pen.setColor(canvas.photoshapeGraphics.penColor);
         pen.setStroke(new BasicStroke(lineThickness));
+        canvasGraphics.smoothDraw();
         pen.drawLine((int) (e.getX() / canvasGraphics.translationMultiplier.multiplierX), (int) (e.getY() / canvasGraphics.translationMultiplier.multiplierY), (int) (initialX / canvasGraphics.translationMultiplier.multiplierX), (int) (initialY / canvasGraphics.translationMultiplier.multiplierX));
 
     }
@@ -152,19 +176,35 @@ class LineTool implements MouseInputListener {
         int y = e.getY();
 
         pen.setColor(canvas.photoshapeGraphics.penColor);
-        pen.setStroke(new BasicStroke(15));
+        pen.setStroke(new BasicStroke(lineThickness));
         canvasGraphics.smoothDraw();
         pen.drawLine(x, y, initialX, initialY);
         canvasGraphics.display();
         canvasGraphics.update(pen);
     }
+
+    @Override
+    public void changeToolOptions() {
+        canvas.optionsDialogue.displayableOptions.switchOptions(options, () ->
+            lineThickness = ((JSlider) options[0].optionValue).getValue()
+        );
+    }
 }
 
-class Erase implements MouseInputListener {
+class Erase implements MouseInputListener, OptionsToolPanel {
     public int brushSize = 15;
     public int[] brushSizeList;
     PhotoshapeCanvas canvas;
     PhotoshapeCanvas.PhotoshapeGraphics canvasGraphics;
+
+    OptionContent[] options = new OptionContent[]{
+      new OptionContent("Eraser Size ", new OptionContent.SliderOption(0, 255, brushSize * 2) {
+          @Override
+          public void stateChanged(ChangeEvent e) {
+              options[0].optionName.setText(options[0].name + ((JSlider) options[0].optionValue).getValue());
+          }
+      })
+    };
 
     public Erase(PhotoshapeCanvas canvas) {
         this.canvas = canvas;
@@ -217,6 +257,7 @@ class Erase implements MouseInputListener {
             x = 0;
         if(y < 0)
             y = 0;
+
         if(brushDiameterX + x > image.getWidth())
             brushDiameterX = image.getWidth() - x;
         if(brushDiameterY + y > image.getHeight())
@@ -225,18 +266,38 @@ class Erase implements MouseInputListener {
         canvasGraphics.update(canvasGraphics.getPen());
         canvasGraphics.draw();
     }
+
+    @Override
+    public void changeToolOptions() {
+        canvas.optionsDialogue.displayableOptions.switchOptions(options, () ->
+                brushSize = ((JSlider) options[0].optionValue).getValue()/2
+        );
+    }
 }
 
-class PaintBucket implements MouseInputListener {
+class PaintBucket implements MouseInputListener, OptionsToolPanel {
     //I'm adapting a pathfinding algorithm because I'm using one to make a bot in node.js, and applying the concept to here would be fun.
     PhotoshapeCanvas canvas;
     PhotoshapeCanvas.PhotoshapeGraphics canvasGraphics;
 
+    boolean debugOn = false;
     int tolerance = 50;
+
+    OptionContent[] options = new OptionContent[]{
+            new OptionContent("Tolerance ", new OptionContent.SliderOption(0, 255, tolerance) {
+                @Override
+                public void stateChanged(ChangeEvent e) {
+                    options[0].optionName.setText(options[0].name + ((JSlider) options[0].optionValue).getValue());
+                }
+            }),
+            new OptionContent("Debug Mode ", new JCheckBox())
+    };
 
     public PaintBucket(PhotoshapeCanvas canvas) {
         this.canvas = canvas;
         this.canvasGraphics = canvas.photoshapeGraphics;
+
+
     }
 
     @Override
@@ -246,10 +307,9 @@ class PaintBucket implements MouseInputListener {
         TranslationMultiplier translationMultiplier = canvasGraphics.translationMultiplier;
 
 
-
         int x = (int) (e.getX() / translationMultiplier.multiplierX);
         int y = (int) (e.getY() / translationMultiplier.multiplierY);
-        new BucketPath(x, y).findPath(x, y);
+        new BucketPath(x, y, debugOn).findPath(x, y);
         canvas.image.setRGB(x, y, canvasGraphics.penColor.getRGB());
         canvasGraphics.draw();
     }
@@ -283,7 +343,19 @@ class PaintBucket implements MouseInputListener {
     public void mouseMoved(MouseEvent e) {
 
     }
+
+    @Override
+    public void changeToolOptions() {
+        canvas.optionsDialogue.displayableOptions.switchOptions(options, () -> {
+                    tolerance = ((JSlider) options[0].optionValue).getValue();
+                    debugOn = ((JCheckBox) options[1].optionValue).isSelected();
+                }
+        );
+    }
+
     class BucketPath extends Pathfinder {
+
+
         BufferedImage image = canvas.image;
         int color = canvasGraphics.penColor.getRGB();
 
@@ -301,17 +373,28 @@ class PaintBucket implements MouseInputListener {
             tileMap = new TileMap();
         }
 
+        BucketPath(int x, int y, boolean debugOn) {
+            selectedColor = image.getRGB(x, y);
+            selectedColorR = selectedColor >> 16 & 0xff;
+            selectedColorG = selectedColor >> 8 & 0xff;
+            selectedColorB = selectedColor & 0xff;
+
+            tileMap = new TileMap();
+
+            if(debugOn) {
+                super.indicateTailSkip = () -> {
+                    image.setRGB(currentTile.position.x, currentTile.position.y, color ^ 0xffffff);
+                    canvasGraphics.draw();
+                    currentTile = currentTile.tailingNode;
+                };
+            }
+
+        }
+
         @Override
         public void move() {
             super.move();
             image.setRGB(currentTile.position.x, currentTile.position.y, color);
-        }
-
-        @Override
-        public void indicateTailSkip() {
-            image.setRGB(currentTile.position.x, currentTile.position.y, color ^ 0xffffff);
-            canvasGraphics.draw();
-            super.indicateTailSkip();
         }
 
         @Override
